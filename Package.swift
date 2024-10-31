@@ -20,7 +20,7 @@ let package = Package(
         .target(
             name: "SpreadSheetPackage",
             resources: [
-                .process("Assets.xcassets"),
+                .process("Resources"),
             ]
         ),
         .testTarget(
