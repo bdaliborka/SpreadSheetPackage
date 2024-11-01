@@ -9,11 +9,11 @@ import UIKit
 import SwiftUI
 
 open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, Item, RowHeader>: UIViewController, UICollectionViewDelegate, SelectionDelegate where Item: SpreadSheetItem, ViewModel.Item == Item, RowHeader: SpreadSheetItem, ViewModel.RowHeader == RowHeader {
-    public let viewModel: ViewModel
-    let spreadSheetInfo: SpreadSheetLayoutInfo
-    let elementColorScheme: ElementColorScheme?
-    
     public typealias DataSource = UICollectionViewDiffableDataSource<RowHeader, Item>
+    public let viewModel: ViewModel
+    
+    private let spreadSheetInfo: SpreadSheetLayoutInfo
+    private let elementColorScheme: ElementColorScheme?
     private lazy var supplementaryHorizontalHeaderKind = "columnHeader"
     private static var CellIdentifier: String {
         "SpreadSheetCell"
@@ -26,6 +26,7 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
     }
     private var selectedItem: Item?
     private var selectedHeader: RowHeader?
+    private(set) lazy var dataSource: DataSource = setupDataSource()
     
     public init(viewModel: ViewModel, spreadSheetInfo: SpreadSheetLayoutInfo, elementColorScheme: ElementColorScheme? = nil) {
         self.viewModel = viewModel
@@ -37,9 +38,7 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
     public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
-    private(set) lazy var dataSource: DataSource = setupDataSource()
-    
+        
     lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: setupLayout(for: self.supplementaryHorizontalHeaderKind))
         collectionView.delegate = self
@@ -53,6 +52,46 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
         setupConstraints()
         registerCollectionViewComponents()
         applySnapshot()
+    }
+    
+    public func applySnapshot(animated: Bool = true, reload: Bool = false) {
+        var snapshot = NSDiffableDataSourceSnapshot<RowHeader, Item>()
+        let data = viewModel.generateData()
+        snapshot.appendSections(data.map({ $0.rowItem }))
+        for row in data {
+            snapshot.appendItems(row.columns, toSection: row.rowItem)
+        }
+        if reload {
+            dataSource.applySnapshotUsingReloadData(snapshot)
+        } else {
+            dataSource.apply(snapshot, animatingDifferences: animated)
+        }
+        selectedItem = nil
+    }
+    
+    public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
+        let previousSelectedItem = selectedItem
+        selectedItem = item
+        let previousSelectedHeader = selectedHeader
+        selectedHeader = nil
+        var snapshot = dataSource.snapshot()
+        snapshot.reloadItems(Set([selectedItem, previousSelectedItem]).compactMap({$0}))
+        snapshot.reloadSections(Set([selectedHeader, previousSelectedHeader]).compactMap({ $0 }))
+        dataSource.apply(snapshot)
+        viewModel.select(of: item)
+    }
+    
+    public func didSelect(header: RowHeader) {
+        let previousSelectedHeader = selectedHeader
+        selectedHeader = header
+        let previousSelectedItem = selectedItem
+        selectedItem = nil
+        var snapshot = dataSource.snapshot()
+        snapshot.reloadSections(Set([selectedHeader, previousSelectedHeader]).compactMap({ $0 }))
+        snapshot.reloadItems(Set([selectedItem, previousSelectedItem]).compactMap({$0}))
+        dataSource.apply(snapshot)
+        viewModel.select(of: header)
     }
     
     private func setupView() {
@@ -86,21 +125,6 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
             ),
             supplementaryHorizontalHeaderKind: supplementaryHorizontalHeaderKind
         )
-    }
-    
-    public func applySnapshot(animated: Bool = true, reload: Bool = false) {
-        var snapshot = NSDiffableDataSourceSnapshot<RowHeader, Item>()
-        let data = viewModel.generateData()
-        snapshot.appendSections(data.map({ $0.rowItem }))
-        for row in data {
-            snapshot.appendItems(row.columns, toSection: row.rowItem)
-        }
-        if reload {
-            dataSource.applySnapshotUsingReloadData(snapshot)
-        } else {
-            dataSource.apply(snapshot, animatingDifferences: animated)
-        }
-        selectedItem = nil
     }
     
     private func setupDataSource() -> DataSource {
@@ -210,7 +234,7 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
         return nil
     }
     
-    func cell(elementKind: String, indexPath: IndexPath) -> UICollectionViewCell? {
+    private func cell(elementKind: String, indexPath: IndexPath) -> UICollectionViewCell? {
         var identifier: String? = nil
         
         if elementKind == UICollectionView.elementKindSectionHeader, spreadSheetInfo.hasVerticalHeader {
@@ -224,31 +248,6 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
         } else {
             return nil
         }
-    }
-    
-    public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
-        let previousSelectedItem = selectedItem
-        selectedItem = item
-        let previousSelectedHeader = selectedHeader
-        selectedHeader = nil
-        var snapshot = dataSource.snapshot()
-        snapshot.reloadItems(Set([selectedItem, previousSelectedItem]).compactMap({$0}))
-        snapshot.reloadSections(Set([selectedHeader, previousSelectedHeader]).compactMap({ $0 }))
-        dataSource.apply(snapshot)
-        viewModel.select(of: item)
-    }
-    
-    public func didSelect(header: RowHeader) {
-        let previousSelectedHeader = selectedHeader
-        selectedHeader = header
-        let previousSelectedItem = selectedItem
-        selectedItem = nil
-        var snapshot = dataSource.snapshot()
-        snapshot.reloadSections(Set([selectedHeader, previousSelectedHeader]).compactMap({ $0 }))
-        snapshot.reloadItems(Set([selectedItem, previousSelectedItem]).compactMap({$0}))
-        dataSource.apply(snapshot)
-        viewModel.select(of: header)
     }
 }
 
