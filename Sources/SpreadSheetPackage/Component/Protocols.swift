@@ -25,7 +25,7 @@ public protocol SpreadSheetDataSourceAndDelegate {
     associatedtype Item: SpreadSheetItem
     associatedtype RowHeader: SpreadSheetItem
     func horizontalHeaderItem(for column: Int) -> Item
-    func generateData() -> [RowWrapper<Item,  RowHeader>]
+    func generateData(_ numberOfColumns: Int) -> [RowWrapper<Item,  RowHeader>]
     var sortOrder: SortOrder { get }
     var sortByItem: Item? { get }
     var delegate: (any SelectionDelegate<RowHeader>)? { get }

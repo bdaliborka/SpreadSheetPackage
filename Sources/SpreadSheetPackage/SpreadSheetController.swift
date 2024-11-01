@@ -56,7 +56,7 @@ open class SpreadSheetController<ViewModel: SpreadSheetDataSourceAndDelegate, It
     
     public func applySnapshot(animated: Bool = true, reload: Bool = false) {
         var snapshot = NSDiffableDataSourceSnapshot<RowHeader, Item>()
-        let data = viewModel.generateData()
+        let data = viewModel.generateData(spreadSheetInfo.numberOfColumns)
         snapshot.appendSections(data.map({ $0.rowItem }))
         for row in data {
             snapshot.appendItems(row.columns, toSection: row.rowItem)
